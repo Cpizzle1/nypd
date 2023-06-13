@@ -1,0 +1,137 @@
+---
+title: "nypd2"
+author: "cp santos"
+date: "2023-06-12"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+# Load the dataset
+
+```{r arrests_load}
+# readr::read_csv("./Downloads/NYPD_Shooting_Incident_Data__Historic_.csv")
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(maps)
+nypd_arrests <-read_csv("./Downloads/NYPD_Shooting_Incident_Data__Historic_.csv")
+```
+## Data Cleaning and processing
+```{r omit_nypd}
+nypd_arrests <- na.omit(nypd_arrests)
+```
+
+```{r nypdate}
+nypd_arrests$OCCUR_DATE <- as.Date(nypd_arrests$OCCUR_DATE)
+nypd_arrests$OCCUR_TIME <- as.POSIXct(nypd_arrests$OCCUR_TIME, format = "%H:%M:%S")
+```
+
+```{r dateformatnypd}
+nypd_arrests$year <- year(nypd_arrests$OCCUR_DATE)
+nypd_arrests$month <- month(nypd_arrests$OCCUR_DATE, label = TRUE)
+```
+## Data Summary
+```{r nypd_summary}
+summary(nypd_arrests)
+```
+
+```{r cars}
+arrests_by_borough <- nypd_arrests %>%
+  group_by(BORO) %>%
+  summarise(total_arrests = n())
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+## Arrests by borough
+```{r plot_arrest_borough, echo=FALSE}
+ggplot(arrests_by_borough, aes(x = reorder(BORO, -total_arrests), y = total_arrests)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Arrests by Borough",
+       x = "Borough",
+       y = "Total Arrests")
+```
+## Arrests by year
+```{r arrest_year, echo=FALSE}
+arrests_by_year <- nypd_arrests %>%
+  group_by(year) %>%
+  summarise(total_arrests = n())
+ggplot(arrests_by_year, aes(x = year, y = total_arrests)) +
+  geom_line() +
+  labs(title = "Arrests by Year",
+       x = "Year",
+       y = "Total Arrests")
+```
+## Arrests by month
+```{r arrest_month, echo=FALSE}
+arrests_by_month <- nypd_arrests %>%
+  group_by(month) %>%
+  summarise(total_arrests = n())
+
+ggplot(arrests_by_month, aes(x = month, y = total_arrests)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  labs(title = "Arrests by Month",
+       x = "Month",
+       y = "Total Arrests")
+```
+
+```{r arrests_load2}
+# readr::read_csv("./Downloads/NYPD_Shooting_Incident_Data__Historic_.csv")
+library(dplyr)
+library(caret)
+
+# Data cleaning
+nypd_arrests <- na.omit(nypd_arrests)
+
+# Data preprocessing
+# Convert occur_date column to date format
+nypd_arrests$OCCUR_DATE <- as.Date(nypd_arrests$OCCUR_DATE)
+
+# Select relevant features for the model
+selected_features <- c("PRECINCT", "PERP_SEX", "PERP_RACE", 
+                       "VIC_AGE_GROUP", "VIC_SEX", "VIC_RACE", "Longitude")
+
+# Create a subset of data with selected features
+model_data <- nypd_arrests[selected_features]
+
+# Define the target variable
+target_variable <- "Longitude"
+
+# Split the data into training and testing sets
+set.seed(123)
+train_index <- createDataPartition(model_data[[target_variable]], p = 0.8, list = FALSE)
+train_data <- model_data[train_index, ]
+test_data <- model_data[-train_index, ]
+
+# Train the linear regression model
+model <- train(
+  x = select(train_data, -{{target_variable}}),
+  y = train_data[[target_variable]],
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+# Make predictions on the test set
+predictions <- predict(model, newdata = select(test_data, -{{target_variable}}))
+
+# Evaluate the model
+rmse <- sqrt(mean((predictions - test_data[[target_variable]])^2, na.rm = TRUE))
+print(paste0("Root Mean Squared Error (RMSE): ", rmse))
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
